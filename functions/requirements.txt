@@ -1,0 +1,4 @@
+flask
+firebase-functions
+# Gunicorn 是一個推薦的 WSGI 伺服器，能提供更好的效能
+gunicorn

@@ -1,0 +1,122 @@
+{% include 'header.html' %}
+
+<h1>HP License List</h1>
+
+<a id="next_button" class="nav-link">Next &gt;&gt;</a>
+
+<p id="error_message" style="color: red;"></p>
+
+<div id="loader" class="loader"></div>
+
+<div id="data_container" style="display: none;">
+    <table  class=CommitLog>
+        <thead>
+            <tr class='CommitLog-item CommitLog-item--chromiumOneline'>
+                <th>#</th>
+                <th>SerialNumber</th>
+                <th>Hardware Model</th>
+                <th>SKU</th>
+                <th>RLZ</th>
+                <th>Region Code</th>
+                <th>Identifier</th>
+                <th>CreateTime</th>
+            </tr>
+        </thead>
+        <tbody id="licenses_table_body">
+            </tbody>
+    </table>
+</div>
+
+<script>
+    // Get references to the DOM elements
+    const loader = document.getElementById('loader');
+    const dataContainer = document.getElementById('data_container');
+    const tableBody = document.getElementById('licenses_table_body');
+    const nextButton = document.getElementById('next_button');
+    const errorMessage = document.getElementById('error_message');
+    
+    // Store the next page token
+    let nextPageToken = null;
+
+    /**
+     * Fetches license data from our server's API and updates the page.
+     * @param {string|null} token - The page token for pagination.
+     */
+    async function fetchLicenses(token = null) {
+        // 1. Show loader and hide data/button
+        loader.style.display = 'block';
+        dataContainer.style.display = 'none';
+        nextButton.style.display = 'none';
+        errorMessage.textContent = ''; // Clear previous errors
+
+        let url = '/LP/api/licenses';
+        if (token) {
+            url += `?page_token=${token}`;
+        }
+
+        try {
+            // 2. Fetch data from our API endpoint
+            const response = await fetch(url);
+
+            const contentType = response.headers.get("content-type");
+            if (!response.ok || !contentType || !contentType.includes("application/json")) {
+                // If not JSON, it's likely an HTML error page.
+                throw new Error(`Server did not return valid JSON. Check API route.${response.text}`);
+            }
+
+            const data = await response.json();
+
+            // 3. Populate the table with new data
+            tableBody.innerHTML = ''; // Clear existing rows
+            if (data.licenses && data.licenses.length > 0) {
+                data.licenses.forEach((license, index) => {
+                    const identifier = (license.name && license.name.includes('/')) ? license.name.split('/')[3] : 'N/A';
+                    const row = `
+                        <tr>
+                            <td><span class='CommitLog-tagLabel u-lineNum'>${index + 1}</td>
+                            <td><span class='u-sha1 u-monospace CommitLog-sha1'>${license.serialNumber}</span></td>
+                            <td><span class='CommitLog-tagLabel u-monospace'>${license.hardwareModel}</span></td>
+                            <td><span class='CommitLog-tagLabel u-monospace'>${license.sku}</span></td>
+                            <td><span class="CommitLog-tagLabel u-monospace">${license.rlzCode}</span></td>
+                            <td><span class="CommitLog-tagLabel u-monospace">${license.regionCode}</span></td>
+                            <td><span class="CommitLog-tagLabel u-monospace">${identifier}</span></td>
+                            <td><span class='CommitLog-time'>${license.createTime}</span></td>
+                        </tr>`;
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            } else {
+                 tableBody.innerHTML = '<tr><td colspan="8">No licenses found.</td></tr>';
+            }
+
+
+            // 4. Update the next page token and button visibility
+            nextPageToken = data.nextPageToken;
+            if (nextPageToken) {
+                nextButton.style.display = 'inline-block';
+            }
+
+        } catch (error) {
+            console.error('Fetch error:', error);
+            errorMessage.textContent = `Failed to load data: ${error.message}`;
+        } finally {
+            // 5. Hide loader and show the data container
+            loader.style.display = 'none';
+            dataContainer.style.display = 'block';
+        }
+    }
+
+    // Add click event listener for the "Next" button
+    nextButton.addEventListener('click', () => {
+        if (nextPageToken) {
+            fetchLicenses(nextPageToken);
+        }
+    });
+
+    // Initial data load when the page is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchLicenses();
+    });
+</script>
+
+</body>
+</html>
